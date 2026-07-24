@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="ca">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Glyphs Export Prep</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="workspace" aria-label="Glyphs export prep">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">OpenType · Google Fonts</p>
+            <h1>Glyphs Export Prep</h1>
+          </div>
+          <button class="icon-button" id="resetButton" type="button" aria-label="Neteja">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M3 12a9 9 0 1 0 3-6.7"></path>
+              <path d="M3 4v6h6"></path>
+            </svg>
+          </button>
+        </header>
+
+        <nav class="tabs" aria-label="Seccions">
+          <button class="tab-button is-active" id="engineTab" type="button" data-tab="engine">Engine</button>
+          <button class="tab-button" id="dataTab" type="button" data-tab="data">Data</button>
+        </nav>
+
+        <div class="tab-panel is-active" id="enginePanel">
+          <div class="grid">
+            <section class="panel upload-panel">
+              <label class="dropzone" id="dropzone">
+                <input id="fileInput" type="file" accept=".glyphs,.ttf,.otf">
+                <span class="file-icon" aria-hidden="true">
+                  <svg viewBox="0 0 48 48">
+                    <path d="M14 4h14l10 10v30H14z"></path>
+                    <path d="M28 4v10h10"></path>
+                    <path d="M19 30c2.8-8.4 7.2-8.4 10 0"></path>
+                    <path d="M21 25h6"></path>
+                  </svg>
+                </span>
+                <span class="drop-title">Afegeix un .glyphs, .ttf o .otf</span>
+                <span class="drop-meta">Configura fonts Glyphs o diagnostica fonts exportades</span>
+              </label>
+
+              <div class="file-summary" id="fileSummary" hidden>
+                <span id="fileName">Sense arxiu</span>
+                <span id="fileSize"></span>
+              </div>
+
+              <div class="actions">
+                <button class="primary-button" id="downloadButton" type="button" disabled>
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M12 3v12"></path>
+                    <path d="m7 10 5 5 5-5"></path>
+                    <path d="M5 21h14"></path>
+                  </svg>
+                  Baixa l'arxiu configurat
+                </button>
+              </div>
+            </section>
+
+            <section class="panel report-panel" aria-live="polite">
+              <div class="report-header">
+                <h2>Informe</h2>
+                <span class="status-pill" id="statusPill">Esperant arxiu</span>
+              </div>
+              <div class="metrics-grid" id="metricsGrid">
+                <div>
+                  <span>Màsters</span>
+                  <strong>--</strong>
+                </div>
+                <div>
+                  <span>UPM</span>
+                  <strong>--</strong>
+                </div>
+                <div>
+                  <span>Glifs</span>
+                  <strong>--</strong>
+                </div>
+                <div>
+                  <span>Taules</span>
+                  <strong>--</strong>
+                </div>
+              </div>
+              <ol class="checklist" id="checklist">
+                <li>Carrega un arxiu per començar.</li>
+              </ol>
+              <p class="export-note">
+                Després de baixar-lo, obre el .glyphs a Glyphs i exporta un .ttf o .otf per validar les taules OpenType.
+              </p>
+            </section>
+          </div>
+
+          <section class="panel details-panel">
+            <div class="report-header">
+              <h2>Mètriques per màster</h2>
+              <span class="status-pill quiet" id="boundsPill">Sense dades</span>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Màster</th>
+                    <th>typoAsc</th>
+                    <th>typoDesc</th>
+                    <th>hheaAsc</th>
+                    <th>hheaDesc</th>
+                    <th>winAsc</th>
+                    <th>winDesc</th>
+                  </tr>
+                </thead>
+                <tbody id="masterRows">
+                  <tr>
+                    <td colspan="7">Encara no hi ha cap arxiu carregat.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+
+        <section class="panel data-panel tab-panel" id="dataPanel">
+          <div class="report-header">
+            <h2>Font Info · General</h2>
+            <span class="status-pill quiet" id="dataStatus">Dades locals</span>
+          </div>
+          <div class="data-grid">
+            <label>
+              <span>Designer</span>
+              <input id="designerInput" type="text" autocomplete="off">
+            </label>
+            <label>
+              <span>Designer URL</span>
+              <input id="designerUrlInput" type="url" autocomplete="off">
+            </label>
+            <label>
+              <span>Manufacturer URL</span>
+              <input id="manufacturerUrlInput" type="url" autocomplete="off">
+            </label>
+            <label>
+              <span>Copyright</span>
+              <input id="copyrightInput" type="text" autocomplete="off">
+            </label>
+            <label>
+              <span>Version String</span>
+              <input id="versionStringInput" type="text" autocomplete="off">
+            </label>
+            <label>
+              <span>Trademark</span>
+              <input id="trademarkInput" type="text" autocomplete="off">
+            </label>
+            <label>
+              <span>Vendor Identification</span>
+              <input id="vendorIdInput" type="text" autocomplete="off" maxlength="4">
+            </label>
+            <label class="span-all">
+              <span>License</span>
+              <textarea id="licenseInput" rows="9"></textarea>
+            </label>
+          </div>
+          <div class="data-actions">
+            <button class="secondary-button" id="loadDataButton" type="button">Load data</button>
+            <button class="secondary-button" id="saveDataButton" type="button">Save data</button>
+            <input id="dataFileInput" type="file" accept=".json,application/json" hidden>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>

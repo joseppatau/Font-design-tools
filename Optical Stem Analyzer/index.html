@@ -1,0 +1,969 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Optical Stem Analyzer</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: Canvas;
+      --fg: CanvasText;
+      --muted: color-mix(in srgb, CanvasText 62%, Canvas);
+      --line: color-mix(in srgb, CanvasText 22%, Canvas);
+      --soft: color-mix(in srgb, CanvasText 8%, Canvas);
+      --accent: #3b82f6;
+      --ok: #16a34a;
+      --warn: #dc2626;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font: 14px/1.35 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--fg);
+    }
+
+    main {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 18px;
+    }
+
+    header {
+      display: flex;
+      gap: 16px;
+      align-items: end;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+
+    h1 {
+      margin: 0 0 4px;
+      font-size: 20px;
+      font-weight: 600;
+    }
+
+    p {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(110px, 1fr));
+      gap: 10px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--soft);
+      margin-bottom: 16px;
+    }
+
+    label {
+      display: grid;
+      gap: 4px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .check {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      align-self: end;
+      min-height: 30px;
+    }
+
+    .check input {
+      min-height: 0;
+      width: auto;
+    }
+
+    input, select, button {
+      font: inherit;
+      border-radius: 6px;
+      border: 1px solid var(--line);
+      background: var(--bg);
+      color: var(--fg);
+      min-height: 30px;
+      padding: 4px 8px;
+    }
+
+    button {
+      align-self: end;
+      cursor: pointer;
+      background: var(--fg);
+      color: var(--bg);
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(280px, 1.1fr) minmax(300px, .9fr);
+      gap: 16px;
+      align-items: start;
+    }
+
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+      background: var(--bg);
+    }
+
+    .panel-head {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      font-weight: 600;
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .panel-head span {
+      color: var(--muted);
+      font-weight: 400;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: auto;
+      background: var(--bg);
+      touch-action: none;
+    }
+
+    .preview-wrap {
+      position: relative;
+    }
+
+    .beam-input {
+      position: absolute;
+      width: 34px;
+      min-height: 20px;
+      padding: 1px 3px;
+      border-radius: 0;
+      background: var(--bg);
+      color: var(--fg);
+      border: 1px solid var(--line);
+      font-size: 10px;
+      text-align: center;
+      transform: translate(-50%, -50%);
+      display: none;
+      z-index: 2;
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      padding: 12px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .metric {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px;
+    }
+
+    .metric b {
+      display: block;
+      font-size: 18px;
+      margin-bottom: 2px;
+    }
+
+    .metric span {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-variant-numeric: tabular-nums;
+    }
+
+    th, td {
+      padding: 7px 9px;
+      border-bottom: 1px solid var(--line);
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    th:first-child, td:first-child { text-align: left; }
+    tr:last-child td { border-bottom: 0; }
+
+    .ok { color: var(--ok); }
+    .bad { color: var(--warn); }
+
+    .note {
+      padding: 10px 12px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    @media (max-width: 820px) {
+      .controls, .layout { grid-template-columns: 1fr; }
+      .metrics { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1>Optical Stem Analyzer</h1>
+      <p>Load a filled SVG glyph and compare straight stems with curved stroke thickness.</p>
+    </div>
+  </header>
+
+  <section class="controls" aria-label="Analyzer controls">
+    <label>
+      SVG file
+      <input id="fileInput" type="file" accept=".svg,image/svg+xml">
+    </label>
+    <label>
+      Scan direction
+      <select id="scanMode">
+        <option value="horizontal">Horizontal sections</option>
+        <option value="vertical">Vertical sections</option>
+      </select>
+    </label>
+    <label>
+      Samples
+      <input id="sampleCount" type="number" min="20" max="240" value="90">
+    </label>
+    <label>
+      Dark threshold
+      <input id="threshold" type="number" min="1" max="254" value="140">
+    </label>
+    <label class="check">
+      <input id="crossToggle" type="checkbox">
+      Crossbeam
+    </label>
+    <button id="analyzeBtn">Analyze</button>
+  </section>
+
+  <section class="layout">
+    <div class="panel">
+      <div class="panel-head">Glyph preview <span id="previewStatus">No SVG loaded</span></div>
+      <div class="preview-wrap" id="previewWrap">
+        <canvas id="preview" width="760" height="760"></canvas>
+        <input id="straightOverride" class="beam-input" type="number" step="0.1" aria-label="Real straight stem">
+        <input id="curveOverride" class="beam-input" type="number" step="0.1" aria-label="Real curve stem">
+      </div>
+      <div class="note">Enable Crossbeam, then drag each handle independently: the left handle moves the horizontal measure, the top handle moves the vertical guide.</div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">Optical result <span id="resultStatus">Waiting</span></div>
+      <div class="metrics">
+        <div class="metric">
+          <b id="straightMetric">-</b>
+          <span>median straight stem</span>
+        </div>
+        <div class="metric">
+          <b id="curveMetric">-</b>
+          <span>median curve stroke</span>
+        </div>
+        <div class="metric">
+          <b id="idealMetric">-</b>
+          <span>suggested curve stroke</span>
+        </div>
+        <div class="metric">
+          <b id="diffMetric">-</b>
+          <span>current minus suggested</span>
+        </div>
+      </div>
+      <canvas id="plot" width="520" height="250"></canvas>
+      <table>
+        <thead>
+          <tr>
+            <th>Section</th>
+            <th>Straight</th>
+            <th>Curve</th>
+            <th>Ideal</th>
+            <th>Diff</th>
+          </tr>
+        </thead>
+        <tbody id="rows">
+          <tr><td colspan="5">Load an SVG to start.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<script>
+(() => {
+  const fileInput = document.getElementById("fileInput");
+  const scanMode = document.getElementById("scanMode");
+  const sampleCount = document.getElementById("sampleCount");
+  const threshold = document.getElementById("threshold");
+  const crossToggle = document.getElementById("crossToggle");
+  const analyzeBtn = document.getElementById("analyzeBtn");
+  const previewWrap = document.getElementById("previewWrap");
+  const preview = document.getElementById("preview");
+  const plot = document.getElementById("plot");
+  const rows = document.getElementById("rows");
+  const previewStatus = document.getElementById("previewStatus");
+  const resultStatus = document.getElementById("resultStatus");
+  const straightMetric = document.getElementById("straightMetric");
+  const curveMetric = document.getElementById("curveMetric");
+  const idealMetric = document.getElementById("idealMetric");
+  const diffMetric = document.getElementById("diffMetric");
+  const straightOverride = document.getElementById("straightOverride");
+  const curveOverride = document.getElementById("curveOverride");
+
+  let svgText = "";
+  let image = null;
+  let svgInfo = null;
+  let lastAnalysis = null;
+  let cross = null;
+  let draggingLine = null;
+  let manualScale = 1;
+  let lastRawCross = null;
+  let syncingOverrides = false;
+
+  function curveIncrement(stem) {
+    const table = [
+      [10, 1],
+      [30, 2],
+      [60, 3.5],
+      [90, 5],
+      [120, 6],
+      [160, 8],
+      [200, 10],
+      [250, 13.5]
+    ];
+    if (stem <= table[0][0]) return table[0][1];
+    for (let i = 0; i < table.length - 1; i++) {
+      const [s1, p1] = table[i];
+      const [s2, p2] = table[i + 1];
+      if (stem >= s1 && stem <= s2) {
+        const t = (stem - s1) / (s2 - s1);
+        return p1 + (p2 - p1) * t;
+      }
+    }
+    return table[table.length - 1][1];
+  }
+
+  function median(values) {
+    if (!values.length) return 0;
+    const sorted = values.slice().sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+  }
+
+  function fmt(value) {
+    return Number.isFinite(value) ? value.toFixed(1) : "-";
+  }
+
+  function svgToImage(text) {
+    return new Promise((resolve, reject) => {
+      const blob = new Blob([text], { type: "image/svg+xml" });
+      const url = URL.createObjectURL(blob);
+      const img = new Image();
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        resolve(img);
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        reject(new Error("Could not load SVG"));
+      };
+      img.src = url;
+    });
+  }
+
+  function parseSvgInfo(text) {
+    const doc = new DOMParser().parseFromString(text, "image/svg+xml");
+    const svg = doc.querySelector("svg");
+    if (!svg) return null;
+
+    const viewBox = (svg.getAttribute("viewBox") || "").trim().split(/[\s,]+/).map(Number);
+    if (viewBox.length === 4 && viewBox.every(Number.isFinite) && viewBox[2] > 0 && viewBox[3] > 0) {
+      return { width: viewBox[2], height: viewBox[3], source: "viewBox" };
+    }
+
+    const width = parseFloat(svg.getAttribute("width"));
+    const height = parseFloat(svg.getAttribute("height"));
+    if (Number.isFinite(width) && Number.isFinite(height) && width > 0 && height > 0) {
+      return { width, height, source: "width/height" };
+    }
+
+    return null;
+  }
+
+  function darkAt(data, width, x, y, limit) {
+    const index = (y * width + x) * 4;
+    const r = data[index];
+    const g = data[index + 1];
+    const b = data[index + 2];
+    const a = data[index + 3];
+    if (a < 20) return false;
+    return (r + g + b) / 3 < limit;
+  }
+
+  function findBounds(data, width, height, limit) {
+    let minX = width, maxX = -1, minY = height, maxY = -1;
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        if (darkAt(data, width, x, y, limit)) {
+          minX = Math.min(minX, x);
+          maxX = Math.max(maxX, x);
+          minY = Math.min(minY, y);
+          maxY = Math.max(maxY, y);
+        }
+      }
+    }
+    if (maxX < minX || maxY < minY) return null;
+    return { minX, maxX, minY, maxY };
+  }
+
+  function runsOnLine(data, width, height, fixed, horizontal, limit) {
+    const runs = [];
+    let inRun = false;
+    let start = 0;
+    const length = horizontal ? width : height;
+    for (let i = 0; i < length; i++) {
+      const x = horizontal ? i : fixed;
+      const y = horizontal ? fixed : i;
+      const dark = darkAt(data, width, x, y, limit);
+      if (dark && !inRun) {
+        start = i;
+        inRun = true;
+      }
+      if ((!dark || i === length - 1) && inRun) {
+        const end = dark && i === length - 1 ? i : i - 1;
+        if (end - start + 1 > 1) runs.push({ start, end, width: end - start + 1 });
+        inRun = false;
+      }
+    }
+    return runs;
+  }
+
+  function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+  }
+
+  function unitScales(drawW, drawH) {
+    return svgInfo
+      ? { x: svgInfo.width / drawW, y: svgInfo.height / drawH }
+      : { x: 1, y: 1 };
+  }
+
+  function analyzeCrossPoint(state) {
+    if (!state || !cross) return null;
+
+    const horizontalRuns = runsOnLine(
+      state.data,
+      state.width,
+      state.height,
+      Math.round(cross.y),
+      true,
+      state.limit
+    );
+    const verticalRuns = runsOnLine(
+      state.data,
+      state.width,
+      state.height,
+      Math.round(cross.x),
+      false,
+      state.limit
+    );
+
+    if (horizontalRuns.length < 2) return null;
+
+    const first = horizontalRuns[0];
+    const last = horizontalRuns[horizontalRuns.length - 1];
+    const rawStraight = first.width * state.unitScaleX;
+    const rawCurve = last.width * state.unitScaleX;
+    const straight = rawStraight * manualScale;
+    const curve = rawCurve * manualScale;
+    const ideal = straight + curveIncrement(straight);
+    const diff = curve - ideal;
+    const section = 100 - ((cross.y - state.bounds.minY) / Math.max(1, state.bounds.maxY - state.bounds.minY)) * 100;
+
+    return { first, last, rawStraight, rawCurve, straight, curve, ideal, diff, section, verticalRuns };
+  }
+
+  function analyzeImage() {
+    if (!image) return;
+
+    const ctx = preview.getContext("2d");
+    const w = preview.width;
+    const h = preview.height;
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = "white";
+    ctx.fillRect(0, 0, w, h);
+
+    const pad = 28;
+    const scale = Math.min((w - pad * 2) / image.width, (h - pad * 2) / image.height);
+    const drawW = image.width * scale;
+    const drawH = image.height * scale;
+    const dx = (w - drawW) / 2;
+    const dy = (h - drawH) / 2;
+    ctx.drawImage(image, dx, dy, drawW, drawH);
+
+    const limit = Number(threshold.value) || 140;
+    const data = ctx.getImageData(0, 0, w, h).data;
+    const bounds = findBounds(data, w, h, limit);
+    if (!bounds) {
+      resultStatus.textContent = "No dark shape found";
+      return;
+    }
+
+    if (!cross) {
+      cross = {
+        x: bounds.minX + (bounds.maxX - bounds.minX) * 0.5,
+        y: bounds.minY + (bounds.maxY - bounds.minY) * 0.5
+      };
+    } else {
+      cross.x = clamp(cross.x, bounds.minX, bounds.maxX);
+      cross.y = clamp(cross.y, bounds.minY, bounds.maxY);
+    }
+
+    const horizontal = scanMode.value === "horizontal";
+    const scales = unitScales(drawW, drawH);
+    const count = Math.max(20, Math.min(240, Number(sampleCount.value) || 90));
+    const samples = [];
+    const straightValues = [];
+    const curveValues = [];
+
+    const start = horizontal ? bounds.minY : bounds.minX;
+    const end = horizontal ? bounds.maxY : bounds.maxX;
+    const span = end - start;
+
+    for (let i = 0; i < count; i++) {
+      const t = (i + 0.5) / count;
+      const fixed = Math.round(start + span * t);
+      const runs = runsOnLine(data, w, h, fixed, horizontal, limit);
+      if (runs.length < 2) continue;
+
+      const measureScale = horizontal ? scales.x : scales.y;
+      const straight = runs[0].width * measureScale * manualScale;
+      const curve = runs[runs.length - 1].width * measureScale * manualScale;
+      const ideal = straight + curveIncrement(straight);
+      const diff = curve - ideal;
+      const section = horizontal
+        ? 100 - ((fixed - bounds.minY) / Math.max(1, bounds.maxY - bounds.minY)) * 100
+        : ((fixed - bounds.minX) / Math.max(1, bounds.maxX - bounds.minX)) * 100;
+
+      samples.push({ fixed, section, straight, curve, ideal, diff, runs });
+      straightValues.push(straight);
+      curveValues.push(curve);
+    }
+
+    lastAnalysis = {
+      data,
+      width: w,
+      height: h,
+      bounds,
+      limit,
+      dx,
+      dy,
+      drawW,
+      drawH,
+      unitScaleX: scales.x,
+      unitScaleY: scales.y
+    };
+
+    const crossResult = crossToggle.checked ? analyzeCrossPoint(lastAnalysis) : null;
+    drawPreview(ctx, samples, horizontal, crossResult);
+    updateMetrics(samples, straightValues, curveValues, crossResult);
+    drawPlot(samples);
+    updateTable(samples, crossResult);
+    positionOverrideInputs(crossResult);
+  }
+
+  function drawPreview(ctx, samples, horizontal, crossResult) {
+    ctx.lineWidth = 1;
+    for (const sample of samples.filter((_, i) => i % 4 === 0)) {
+      const first = sample.runs[0];
+      const last = sample.runs[sample.runs.length - 1];
+      ctx.strokeStyle = "rgba(59,130,246,.78)";
+      ctx.beginPath();
+      if (horizontal) {
+        ctx.moveTo(first.start, sample.fixed);
+        ctx.lineTo(first.end, sample.fixed);
+      } else {
+        ctx.moveTo(sample.fixed, first.start);
+        ctx.lineTo(sample.fixed, first.end);
+      }
+      ctx.stroke();
+      ctx.strokeStyle = "rgba(220,38,38,.78)";
+      ctx.beginPath();
+      if (horizontal) {
+        ctx.moveTo(last.start, sample.fixed);
+        ctx.lineTo(last.end, sample.fixed);
+      } else {
+        ctx.moveTo(sample.fixed, last.start);
+        ctx.lineTo(sample.fixed, last.end);
+      }
+      ctx.stroke();
+    }
+
+    if (!crossToggle.checked || !cross) return;
+
+    ctx.save();
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = "rgba(20,20,20,.82)";
+    ctx.setLineDash([6, 5]);
+    ctx.beginPath();
+    ctx.moveTo(0, cross.y);
+    ctx.lineTo(ctx.canvas.width, cross.y);
+    ctx.moveTo(cross.x, 0);
+    ctx.lineTo(cross.x, ctx.canvas.height);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.fillStyle = "rgba(20,20,20,.9)";
+    ctx.beginPath();
+    ctx.arc(cross.x, cross.y, 4, 0, Math.PI * 2);
+    ctx.fill();
+
+    drawHorizontalHandle(ctx, 12, cross.y);
+    drawVerticalHandle(ctx, cross.x, 12);
+
+    if (crossResult) {
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = "rgba(59,130,246,.92)";
+      ctx.beginPath();
+      ctx.moveTo(crossResult.first.start, cross.y);
+      ctx.lineTo(crossResult.first.end, cross.y);
+      ctx.stroke();
+
+      ctx.strokeStyle = "rgba(220,38,38,.92)";
+      ctx.beginPath();
+      ctx.moveTo(crossResult.last.start, cross.y);
+      ctx.lineTo(crossResult.last.end, cross.y);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function drawHorizontalHandle(ctx, x, y) {
+    ctx.save();
+    ctx.translate(x, y - 6);
+    ctx.fillStyle = "rgba(216,216,216,.92)";
+    roundRect(ctx, 0, 0, 12, 24, 5);
+    ctx.fill();
+    ctx.fillStyle = "#9d9c9c";
+    ctx.beginPath();
+    ctx.moveTo(6, 3);
+    ctx.lineTo(3, 8);
+    ctx.lineTo(9, 8);
+    ctx.closePath();
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(6, 21);
+    ctx.lineTo(3, 16);
+    ctx.lineTo(9, 16);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "#a09999";
+    ctx.fillRect(0, 11, 12, 1);
+    ctx.fillStyle = "#efefef";
+    ctx.fillRect(0, 12, 12, 1);
+    ctx.restore();
+  }
+
+  function drawVerticalHandle(ctx, x, y) {
+    ctx.save();
+    ctx.translate(x - 12, y);
+    ctx.fillStyle = "rgba(216,216,216,.92)";
+    roundRect(ctx, 0, 0, 24, 12, 5);
+    ctx.fill();
+    ctx.fillStyle = "#9d9c9c";
+    ctx.beginPath();
+    ctx.moveTo(3, 6);
+    ctx.lineTo(8, 3);
+    ctx.lineTo(8, 9);
+    ctx.closePath();
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(21, 6);
+    ctx.lineTo(16, 3);
+    ctx.lineTo(16, 9);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "#a09999";
+    ctx.fillRect(11, 0, 1, 12);
+    ctx.fillStyle = "#efefef";
+    ctx.fillRect(12, 0, 1, 12);
+    ctx.restore();
+  }
+
+  function roundRect(ctx, x, y, width, height, radius) {
+    const r = Math.min(radius, width / 2, height / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + width - r, y);
+    ctx.quadraticCurveTo(x + width, y, x + width, y + r);
+    ctx.lineTo(x + width, y + height - r);
+    ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
+    ctx.lineTo(x + r, y + height);
+    ctx.quadraticCurveTo(x, y + height, x, y + height - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+  }
+
+  function updateMetrics(samples, straightValues, curveValues, crossResult) {
+    if (!samples.length) {
+      resultStatus.textContent = "No valid sections";
+      rows.innerHTML = "<tr><td colspan=\"5\">No usable straight/curve sections found.</td></tr>";
+      return;
+    }
+    const straight = crossResult ? crossResult.straight : median(straightValues);
+    const curve = crossResult ? crossResult.curve : median(curveValues);
+    const ideal = crossResult ? crossResult.ideal : straight + curveIncrement(straight);
+    const diff = crossResult ? crossResult.diff : curve - ideal;
+    straightMetric.textContent = fmt(straight);
+    curveMetric.textContent = fmt(curve);
+    idealMetric.textContent = fmt(ideal);
+    diffMetric.textContent = (diff > 0 ? "+" : "") + fmt(diff);
+    diffMetric.className = Math.abs(diff) <= 2 ? "ok" : "bad";
+    resultStatus.textContent = crossResult ? `crossbeam ${fmt(crossResult.section)}%` : `${samples.length} sections`;
+    previewStatus.textContent = svgInfo
+      ? `${fmt(svgInfo.width)} x ${fmt(svgInfo.height)} units`
+      : `${image.width} x ${image.height} px`;
+  }
+
+  function drawPlot(samples) {
+    const ctx = plot.getContext("2d");
+    const w = plot.width;
+    const h = plot.height;
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = "white";
+    ctx.fillRect(0, 0, w, h);
+    if (!samples.length) return;
+
+    const pad = 34;
+    const maxValue = Math.max(...samples.flatMap(s => [s.straight, s.curve, s.ideal])) * 1.12;
+    const xFor = i => pad + (i / Math.max(1, samples.length - 1)) * (w - pad * 2);
+    const yFor = value => h - pad - (value / maxValue) * (h - pad * 2);
+
+    ctx.strokeStyle = "#d4d4d8";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(pad, h - pad);
+    ctx.lineTo(w - pad, h - pad);
+    ctx.stroke();
+
+    function line(key, color) {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      samples.forEach((sample, i) => {
+        const x = xFor(i);
+        const y = yFor(sample[key]);
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+    }
+
+    line("straight", "#3b82f6");
+    line("curve", "#dc2626");
+    line("ideal", "#16a34a");
+
+    ctx.fillStyle = "#27272a";
+    ctx.font = "12px system-ui";
+    ctx.fillText("straight", pad, 16);
+    ctx.fillText("curve", pad + 80, 16);
+    ctx.fillText("ideal", pad + 145, 16);
+  }
+
+  function updateTable(samples, crossResult) {
+    if (!samples.length) return;
+    const every = Math.max(1, Math.floor(samples.length / 14));
+    const visible = samples.filter((_, i) => i % every === 0).slice(0, 16);
+    const crossRow = crossResult ? `<tr>
+        <td>Cross ${fmt(crossResult.section)}%</td>
+        <td>${fmt(crossResult.straight)}</td>
+        <td>${fmt(crossResult.curve)}</td>
+        <td>${fmt(crossResult.ideal)}</td>
+        <td class="${Math.abs(crossResult.diff) <= 2 ? "ok" : "bad"}">${crossResult.diff > 0 ? "+" : ""}${fmt(crossResult.diff)}</td>
+      </tr>` : "";
+    rows.innerHTML = crossRow + visible.map(sample => {
+      const cls = Math.abs(sample.diff) <= 2 ? "ok" : "bad";
+      return `<tr>
+        <td>${fmt(sample.section)}%</td>
+        <td>${fmt(sample.straight)}</td>
+        <td>${fmt(sample.curve)}</td>
+        <td>${fmt(sample.ideal)}</td>
+        <td class="${cls}">${sample.diff > 0 ? "+" : ""}${fmt(sample.diff)}</td>
+      </tr>`;
+    }).join("");
+  }
+
+  function canvasToCss(point) {
+    const rect = preview.getBoundingClientRect();
+    const wrapRect = previewWrap.getBoundingClientRect();
+    return {
+      x: (point.x / preview.width) * rect.width + (rect.left - wrapRect.left),
+      y: (point.y / preview.height) * rect.height + (rect.top - wrapRect.top)
+    };
+  }
+
+  function positionOverrideInputs(crossResult) {
+    if (!crossToggle.checked || !cross || !crossResult) {
+      straightOverride.style.display = "none";
+      curveOverride.style.display = "none";
+      return;
+    }
+
+    const horizontalPos = canvasToCss({ x: 42, y: cross.y });
+    const verticalPos = canvasToCss({ x: cross.x, y: 48 });
+
+    straightOverride.style.left = `${horizontalPos.x}px`;
+    straightOverride.style.top = `${horizontalPos.y}px`;
+    curveOverride.style.left = `${verticalPos.x}px`;
+    curveOverride.style.top = `${verticalPos.y}px`;
+    straightOverride.style.display = "block";
+    curveOverride.style.display = "block";
+
+    lastRawCross = {
+      straight: crossResult.rawStraight,
+      curve: crossResult.rawCurve
+    };
+    syncOverrideInputs(crossResult.straight, crossResult.curve);
+  }
+
+  function syncOverrideInputs(straight, curve) {
+    if (document.activeElement === straightOverride || document.activeElement === curveOverride) return;
+    syncingOverrides = true;
+    straightOverride.value = fmt(straight);
+    curveOverride.value = fmt(curve);
+    syncingOverrides = false;
+  }
+
+  function setManualScaleFromOverride(source) {
+    if (syncingOverrides || !lastRawCross) return;
+    const sourceInput = source === "straight" ? straightOverride : curveOverride;
+    const rawValue = source === "straight" ? lastRawCross.straight : lastRawCross.curve;
+    const typed = Number(sourceInput.value);
+    if (!Number.isFinite(typed) || typed <= 0 || !rawValue) return;
+
+    manualScale = typed / rawValue;
+    syncingOverrides = true;
+    if (source === "straight") {
+      curveOverride.value = fmt(lastRawCross.curve * manualScale);
+    } else {
+      straightOverride.value = fmt(lastRawCross.straight * manualScale);
+    }
+    syncingOverrides = false;
+    analyzeImage();
+  }
+
+  function pointerToCanvas(event) {
+    const rect = preview.getBoundingClientRect();
+    return {
+      x: (event.clientX - rect.left) * (preview.width / rect.width),
+      y: (event.clientY - rect.top) * (preview.height / rect.height)
+    };
+  }
+
+  function hitTestLineHandle(point) {
+    if (!cross) return null;
+    const horizontalHandle = {
+      x1: 0,
+      x2: 34,
+      y1: cross.y - 18,
+      y2: cross.y + 18
+    };
+    const verticalHandle = {
+      x1: cross.x - 20,
+      x2: cross.x + 20,
+      y1: 0,
+      y2: 34
+    };
+
+    if (point.x >= horizontalHandle.x1 && point.x <= horizontalHandle.x2 && point.y >= horizontalHandle.y1 && point.y <= horizontalHandle.y2) {
+      return "horizontal";
+    }
+    if (point.x >= verticalHandle.x1 && point.x <= verticalHandle.x2 && point.y >= verticalHandle.y1 && point.y <= verticalHandle.y2) {
+      return "vertical";
+    }
+    return null;
+  }
+
+  function setCrossFromPointer(event, mode) {
+    if (!lastAnalysis) return;
+    const point = pointerToCanvas(event);
+    cross = cross || {
+      x: lastAnalysis.bounds.minX + (lastAnalysis.bounds.maxX - lastAnalysis.bounds.minX) * 0.5,
+      y: lastAnalysis.bounds.minY + (lastAnalysis.bounds.maxY - lastAnalysis.bounds.minY) * 0.5
+    };
+    if (mode === "vertical") {
+      cross.x = clamp(point.x, lastAnalysis.bounds.minX, lastAnalysis.bounds.maxX);
+    } else if (mode === "horizontal") {
+      cross.y = clamp(point.y, lastAnalysis.bounds.minY, lastAnalysis.bounds.maxY);
+    }
+    analyzeImage();
+  }
+
+  fileInput.addEventListener("change", async () => {
+    const file = fileInput.files && fileInput.files[0];
+    if (!file) return;
+    svgText = await file.text();
+    svgInfo = parseSvgInfo(svgText);
+    manualScale = 1;
+    lastRawCross = null;
+    straightOverride.value = "";
+    curveOverride.value = "";
+    image = await svgToImage(svgText);
+    analyzeImage();
+  });
+
+  analyzeBtn.addEventListener("click", analyzeImage);
+  scanMode.addEventListener("change", analyzeImage);
+  sampleCount.addEventListener("change", analyzeImage);
+  threshold.addEventListener("change", analyzeImage);
+  crossToggle.addEventListener("change", analyzeImage);
+  straightOverride.addEventListener("change", () => setManualScaleFromOverride("straight"));
+  curveOverride.addEventListener("change", () => setManualScaleFromOverride("curve"));
+  straightOverride.addEventListener("keydown", event => {
+    if (event.key === "Enter") straightOverride.blur();
+  });
+  curveOverride.addEventListener("keydown", event => {
+    if (event.key === "Enter") curveOverride.blur();
+  });
+
+  preview.addEventListener("pointerdown", event => {
+    if (!image || !lastAnalysis || !crossToggle.checked) return;
+    const point = pointerToCanvas(event);
+    draggingLine = hitTestLineHandle(point);
+    if (!draggingLine) return;
+    preview.setPointerCapture(event.pointerId);
+    setCrossFromPointer(event, draggingLine);
+  });
+
+  preview.addEventListener("pointermove", event => {
+    if (!draggingLine) return;
+    setCrossFromPointer(event, draggingLine);
+  });
+
+  preview.addEventListener("pointerup", event => {
+    draggingLine = null;
+    if (preview.hasPointerCapture(event.pointerId)) {
+      preview.releasePointerCapture(event.pointerId);
+    }
+  });
+
+  preview.addEventListener("pointercancel", event => {
+    draggingLine = null;
+    if (preview.hasPointerCapture(event.pointerId)) {
+      preview.releasePointerCapture(event.pointerId);
+    }
+  });
+})();
+</script>
+</body>
+</html>
